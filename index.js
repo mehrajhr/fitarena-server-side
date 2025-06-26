@@ -29,9 +29,15 @@ async function run() {
     const eventsCollection = db.collection('events');
 
     // get events all
-    app.get('/all/events', async(req , res) =>{
-        const result = await eventsCollection.find().toArray();
+    app.get('/events/all', async(req , res) =>{
+        const result = await eventsCollection.find().sort({eventDate : 1}).toArray();
         res.send(result);
+    })
+    // create event
+    app.post('/create-event', async(req , res) =>{
+      const eventData = req.body;
+      const result = await eventsCollection.insertOne(eventData);
+      res.send(result);
     })
 
     // Send a ping to confirm a successful connection
