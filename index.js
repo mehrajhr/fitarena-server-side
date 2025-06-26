@@ -48,6 +48,12 @@ async function run() {
     })
 
     // bookings
+    app.get('/booking',async(req,res) =>{
+      const {email} = req.query;
+      const query = {user_email : email};
+      const result = await bookingsData.find(query).toArray();
+      res.send(result);
+    })
     app.post('/booking', async(req , res) =>{
       const booking = req.body;
       const result = await bookingsData.insertOne(booking);
