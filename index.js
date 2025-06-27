@@ -40,6 +40,19 @@ async function run() {
       const result = await eventsCollection.findOne(query);
       res.send(result);
     })
+    // get events for creators
+    app.get('/events/manage',async(req, res) =>{
+      const {email} = req.query;
+      const query = {creatorEmail : email};
+      const result = await eventsCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.get('/events/participants', async(req, res) =>{
+      const {email , id} = req.query;
+      const query = {creatorEmail : email , eventId : id};
+      const result = await bookingsData.find(query).toArray();
+      res.send(result);
+    })
     // create event
     app.post('/create-event', async(req , res) =>{
       const eventData = req.body;
