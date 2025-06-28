@@ -40,6 +40,23 @@ async function run() {
       const result = await eventsCollection.findOne(query);
       res.send(result);
     })
+    app.put('/event/update/:id', async(req , res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const eventData = req.body;
+      const result = await eventsCollection.updateOne(query , {
+        $set : eventData
+      });
+      res.send(result);
+    })
+    app.delete('/event/:id', async(req , res) =>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const bookingQuery = {eventId : id};
+      const result = await eventsCollection.deleteOne(query);
+      const rslt = await bookingsData.deleteMany(bookingQuery);
+      res.send(result);
+    })
     // get events for creators
     app.get('/events/manage',async(req, res) =>{
       const {email} = req.query;
