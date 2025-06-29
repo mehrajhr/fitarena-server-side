@@ -1,8 +1,11 @@
 require('dotenv').config();
 const express = require('express');
-const app = express();
-const port = process.env.PORT || 5000;
 const cors = require('cors');
+const app = express();
+const admin = require('firebase-admin');
+const decoded = Buffer.from(process.env.FB_SECRET_KEY , 'base64').toString('utf-8');
+const serviceAccount = JSON.parse(decoded);
+const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.use(cors());
@@ -20,10 +23,39 @@ const client = new MongoClient(uri, {
   }
 });
 
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const verifyFirebaseToken = async(req , res , next) =>{
+  const authHeader = req.headers?.authorization;
+  if(!authHeader || !authHeader.startsWith('Bearer ')){
+    return res.status(401).send({message : 'Unauthorized Access'});
+  }
+  const token = authHeader.split(' ')[1];
+  console.log('using token', token.slice(0,20));
+  try{
+    const decoded = await admin.auth().verifyIdToken(token);
+    console.log(decoded.email);
+    req.decoded = decoded;
+    next();
+  }
+  catch{
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+}
+
+const verifyTokenEmail = (req , res , next) =>{
+  if(req.query.email !== req.decoded.email){
+    return res.status(403).send({message : 'forbidden access'});
+  }
+  next();
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const db = client.db('fitArenaDB');
     const eventsCollection = db.collection('events');
@@ -34,7 +66,7 @@ async function run() {
         const result = await eventsCollection.find().sort({eventDate : 1}).toArray();
         res.send(result);
     })
-    app.get('/event/:id', async(req, res) =>{
+    app.get('/event/:id',verifyFirebaseToken, async(req, res) =>{
       const id = req.params.id;
       const query = {_id : new ObjectId(id)};
       const result = await eventsCollection.findOne(query);
@@ -58,13 +90,13 @@ async function run() {
       res.send(result);
     })
     // get events for creators
-    app.get('/events/manage',async(req, res) =>{
+    app.get('/events/manage',verifyFirebaseToken , verifyTokenEmail ,async(req, res) =>{
       const {email} = req.query;
       const query = {creatorEmail : email};
       const result = await eventsCollection.find(query).toArray();
       res.send(result);
     })
-    app.get('/events/participants', async(req, res) =>{
+    app.get('/events/participants',verifyFirebaseToken , verifyTokenEmail, async(req, res) =>{
       const {email , id} = req.query;
       const query = {creatorEmail : email , eventId : id};
       const result = await bookingsData.find(query).toArray();
@@ -78,7 +110,7 @@ async function run() {
     })
 
     // bookings
-    app.get('/booking',async(req,res) =>{
+    app.get('/booking',verifyFirebaseToken, verifyTokenEmail,async(req,res) =>{
       const {email} = req.query;
       const query = {user_email : email};
       const result = await bookingsData.find(query).toArray();
@@ -97,9 +129,9 @@ async function run() {
     })
 
     // check booking check
-    app.get('/booking/check', async(req, res) =>{
-      const {eventId , user_email} = req.query;
-      const query = {eventId , user_email};
+    app.get('/booking/check',verifyFirebaseToken , verifyTokenEmail , async(req, res) =>{
+      const {eventId , email} = req.query;
+      const query = {eventId , user_email : email};
       const booking = await bookingsData.findOne(query);
       if(booking){
         res.send({booked : true});
@@ -110,8 +142,8 @@ async function run() {
     })
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
